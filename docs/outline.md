@@ -59,3 +59,57 @@ Charge jobs are **special jobs with duration equal to charge time and null weigh
 Determine the scheduling of transfer and charing jobs to **minimize makespan** (**maximum completion time of the last transfer job over all AGVs**).
 
 Less charging jobs could lead to better solutions.
+
+### Problem formulation
+
+Based on BGAP and named **A-BGAP**.
++ n items (jobs)
++ m units (AGV charging opeartions)
++ $p_{ij}$ penalty (sum of the duration of the transfer and charge jobs)
++ $q_{ij}$ resource requirement (energy consumption of a transfer job)
+
+(assignment of item j to unit i). BGAP assigns each item to one unit to minimize penalty and avoid exceeding resource requirement thresholds.
+
+ASP-BC requires a double level of assignment:
+1. **transfer jobs are assigned to charging operations**
+2. charging operations and transfer jobs are **assigned to AGVs**
+
+Let:
++ $J$ be the transfer job with $j\in J$ with $e_j$ the **energy cost** and **processing time** $d_j$.
++ $M$ the AGVs and $m\in M$ with battery capacity $b$.
++ $n$ the number of charge operations and $R=\{1,\dots,n\}$ the **charging operations**. Worst case: charge after each job ($n=|J|$).
++ $t$ charge operation duration (all AGVs start with full battery)
+
+Decision variables:
+- $x_j^m\in\{0,1\}$: 1 if transfer job $j$ is preformed by AGV $m$ and 0 otherwise
+- $q_r^m\in\{0,1\}$: 1 if charging job $r$ is preformed by AGV $m$ and 0 otherwise
+- $y_{jr}^m\in\{0,1\}$: 1 if transfer job $j$ is preformed by AGV $m$ after charging job $r$ and before the next one
+- $C_\text{max}\in\mathbb{Z}^+$ completion time of the transfer process.
+
+Formulation:
+$$z=\min C_\text{max}$$
+$C_\text{max}\geq\sum_{j\in J}d_jx_j^m+\sum_{r\in R\backslash\{1\}}tq_r^m \qquad\forall m\in M$  
+Ensure consistency between the duration of the transfer job and makespan
+
+$\sum_{m\in M}x_j^m=1\qquad \forall j\in J$  
+Each transfer job must be assigned toa single AGV
+
+$\sum_{r\in R}y_{jr}^m=x_j^m\qquad \forall j\in J, m\in M$  
+Require to have at least a charge job r before job j
+
+$2y_{jr}^m\leq x_j^m+q_r^m\qquad \forall j\in J, m\in M, r\in R$  
+Upper bounds on y
+
+$\sum_{j\in J}e_jy_{jr}^m\leq b\qquad \forall m\in M, r\in R$  
+Battery capacity constraints for each charging job
+
+$q_r^m\leq q_{r-1}^m\qquad \forall m\in M,r\in R\backslash\{1\}$  
+Symmetry breaking constraints
+
+$q_1^m=1\qquad \forall m\in M$
+Charge job on each AGV at start
+
+$$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$$
+$$q_r^m\in\{0,1\}\qquad\forall m\in M,r\in R\backslash\{1\}$$
+$$y_{jr}^m\in\{0,1\}\qquad\forall m\in M,j\in J,r\in R$$
+$$C_\text{max}\in\mathbb{R}^+$$
