@@ -175,7 +175,7 @@ This situation arises when the **number of jobs is relatively small** compared t
 
 #### ASP-BC solution with charging operations
 
-Use the BPP solution to solve a BGAP-R where:
+Use the BPP solution $(\bar\chi,\bar\gamma)$ to solve a BGAP-R where:
 - items are charging operations containing transfer jobs
 - AGVs are bings
 
@@ -192,3 +192,44 @@ $\theta_{\bar rm}\in\{0,1\}\qquad\forall \bar r, m\in M$
 Equal to 1 if the charging operation is asssigned to m
 $C_\text{max}\in\mathbb{R}^+$
 
+#### Local search
+
+Explore the neighborhood of a solution and consider given $(\hat x,\hat y)$ and $\hat C_\text{max}$ obtained from the previous step:
+- **add**: move a transfer job from a charging operation of an AGV to a new charging operation of a different AGV.  
+**The optimal solution uses a number of charging operations greater than the minimum one**.  
+    - $\hat c_m$ as the duration of the transfer process on the $m$-th AGV ($\hat c_m=\sum_{j\in J}d_j\hat x_j^m+\sum_{r\in R\backslash\{1\}}t\hat q_r^m$)
+    - $\hat J_m$ as the set of transfer jobs assigned to the $m$-th AGV in the current solution ($\hat J_m=\{j\in J:\hat x_j^m=1\}$)
+    - $s_a(m_1,j,m_2)$ as the **saving** coming by adding job j to $m_1$ to a new charging operation of $m_2$:  
+    $$s_a(m_1,j,m_2)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_m-d_j,\hat c_{m_2}+d_j+t,\hat c_m))$$
+    + if $j*$ only assigned to a charging operation $r*$ then the expression of the new duration is equal to $\hat c_{m_1^*}-d_j-t$.  
+- **swap**: Replace a transfer job of an AGV with a transfer job of a different AGV  
+    - define $s_s(m_1,r_1,j_1,m_2,r_2,j_2)$ as the saving from swapping job $j_1$ from $r_1$ on $m_1$ with job $j_2$ from $r_2$ on $m_2$ without exceeding battery capacity of the two AGVs ($b-\hat b_{r_1}^{m_1}\geq e_{j_2}-e_{j_1}\land b-\hat b_{r_2}^{m_2}\geq e_{j_1}-e_{j_2}$)
+    $$s_s(m_1,r_1j,m_2,r_2,j_2)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_{m_1}-d_{j_1}+d_{j_2},\hat c_{m_2}+d_{j_1}-d_{j_2},\hat c_m))$$
+- **remove**: move a transfer job from a charging operation of an AGV to an already scheduled charging operation of a different AGV.  
+    - $\hat R_m$ the set of charging operations assigned to the $m$-th AGV in the current solution ($\hat R_m=\{r\in R:\hat q_r^m=1\}$)
+    - $\hat b_r^m$ the energy required by the transfer jobs assigned to the r-th charging operation of the m-th AGV ($\hat b_r^m=\sum_{j\in \hat J_m}e_j\hat y_{jr}^m$)
+    - $s_r(m_1,j,m_2,r)$ is the saving coming from removing job j from $m_1$ and assigning it to the charging operation $r$ of $m_2$ without exceeding battery capacity ($b-\hat b_r^m\geq e_j$):
+    $$s_r(m_1,j,m_2,r)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_m-d_j,\hat c_{m_2}+d_j,\hat c_m))$$
+    * if job $j^*$ is the only one assigned to charging operation $r^*$ on $m_1^*$ then the expression of the related transfer process has to be modified
+    
+#### Implementation details
+
+Let $S$ be the solution of the second step.  
+Compute the maximum among the three kinds of savings at each iteration and update the saving $s^*$ and $(\hat x, \hat y)$ obtained:
+1. $S\gets(\hat x,\hat y)$
+2. $s^*=0$
+3. Compute each $s_a$.
+4. Compute each $s_r$
+5. Compute each $s_s$
+6. If $s^*>0$
+    + repeat from step 1.  
+7. stop
+
+To reduce computational effort obtaining the same result **consider only the job assigned to the AGV with the largest makespan** ($m^*=\argmax_{m\in M}\hat c_m$) then compute the savings with $m_1=m^*$.  
+
+The matheuristic approach can be adapted in the case of variable charging time:
+1. The lowe bound becomes $$LB=\left\lceil\frac{\sum_{j\in J}(d_j+\tau e_j)}{|M|}-\tau b\right\rceil$$  
+the numerator represents the total time required by all machines to perform all the transfer and charging jobs. The second term is required to consider the initial AGV charge. No need to solve the BPP to determine $LB$.
+2. Charge job duration has to be modified ($D_{\bar r}=\sum_{j\in J}(d_j+\tau e_j)\bar \chi_{\hat rj}$).  
+The first constraint has to be adapted to ignore the charging time of the last charging job
+3. Saving expressions must be modified to consider the variable charging time.
