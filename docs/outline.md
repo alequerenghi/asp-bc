@@ -113,3 +113,82 @@ $$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$$
 $$q_r^m\in\{0,1\}\qquad\forall m\in M,r\in R\backslash\{1\}$$
 $$y_{jr}^m\in\{0,1\}\qquad\forall m\in M,j\in J,r\in R$$
 $$C_\text{max}\in\mathbb{R}^+$$
+
+Consider residual energy in charging time wrt $\tau$ the charging time per energy unit:
+$C_\text{max}\geq \sum_{j\in J}d_jx_j^m+\tau\sum_{j\in J}\sum_{r\in R\backslash\{n\}}e_jy_{jr}^mq_{r+1}^m\qquad \forall m\in M$  
+The first term is transfer time and the second represent the time of charging operations depending on residual energy.  
+This changes the first constraint
+
+**DA LINEARIZZARE**
+
+## Matheuristic for the ASP-BC
+
+### Transfer job-charging operation assignment
+
+Assignment of the transfer jobs to the charging operations from the solution of **Bin Packing Problem BPP**:
+- bins are charging operations: $\gamma_r$ are binary variables equal to 1 if the $r$-th charging operations is performed
+- items are transfer jobs: $\chi_{rj}$ binary variables equal to 1 if the transfer job $j$ is assigned to the $r$-th charging operation:
+
+$\zeta=\min\sum_{r\in R}\gamma_r$  
+Minimize the number of charging operations
+
+$\sum_{r\in R}\chi_{rj}=1\qquad \forall j\in J$  
+Each job assigned to a charging operation
+
+$\sum_{j\in J}e_j\chi_{rj}\leq b\gamma_r\qquad \forall r\in R$  
+If a charge operation is used, then the sum of the energy consumption of the jobs assigned is lower than the battery capacity
+
+$\gamma_r\leq\gamma_{r-1}\qquad\forall r\in R$  
+Symmetry breaking constraints
+
+$\chi_{rj}\in\{0,1\}\qquad\forall r\in R$  
+$\gamma_r\in\{0,1\}\qquad\forall r\in R$
+
+Let $\bar \zeta$ be the optimum, then the solution is $\max(0,\bar \zeta-|M|)$ is the minimal number of required charges (all AGVs are charged at the beginning).  
+A **valid lower bound** is:
+$$LB=\max\left\{\left\lceil\frac{(\max(0,\bar\zeta-|M|))*t+\sum_{j\in J}d_j}{|M|}\right\rceil,\left\lceil\frac{(\max(0,\bar\zeta-|M|))}{|M|}\right\rceil*t\right\}$$
+The numerator of the first term is the **minimum total time required by all AGVs to perform all the charging and transfer operations**. The second term takes into accuont the indivisibility of the charging operations.  
+
+**The solution does not necessarily use the lowest number of charges**.
+
+### 4.2. Charging operation-AGV assignment
+
+Find a feasible solution for the ASP-BC.  
+If $\bar\zeta\leq|M|$ then a **feasible solution without charging operations exists**.  
+Otherwise if $\bar\zeta>|M|$ intermediate charging operations are required.
+
+#### 4.2.1. Solution without charging operations
+
+Solve a BGAP with resource Constraints (BGAP-C)
+
+$$z=\min C_\text{max}$$
+$C_\text{max}\geq\sum_{j\in J}d_jx_j^m\qquad\forall m\in M$  
+
+$\sum_{m\in M}x_j^m=1\qquad \forall j\in J$  
+
+$\sum_{j\in J}e_jx_{j}^m\leq b\qquad \forall m\in M$  
+
+$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$
+$C_\text{max}\in\mathbb{R}^+$
+
+This situation arises when the **number of jobs is relatively small** compared to the number of AGVs or the **job energy consumption are low** wrt battery capacity.
+
+#### ASP-BC solution with charging operations
+
+Use the BPP solution to solve a BGAP-R where:
+- items are charging operations containing transfer jobs
+- AGVs are bings
+
+Let $\bar R$ be the smallest subset of charging jobs in a feasible solution ($\bar R=\{r\in R:\bar\gamma_r=1\}$). Each charging job $\bar r$ has duration $D_{\bar r}$ given by the total processing time of all the jobs assigned to that charging opeartion and the charging time $D_{\bar r}=(\sum_{j\in J}d_j\bar\chi_{\bar rj})+t$.  Solve the BGAP-R to determine a feasible solution of ASP-BC:
+
+$$z=\min C_\text{max}$$
+$C_\text{max}\geq\left(\sum_{\bar r\in\bar R}D_{\bar r}\theta_{\bar rm}\right)-t\qquad\forall m\in M$  
+Subtraction due to initial battery charge
+
+$\sum_{m\in M}\theta_{\bar rm}=1\qquad \forall \bar r\in\bar R$  
+All bins are assigned to an AGV
+
+$\theta_{\bar rm}\in\{0,1\}\qquad\forall \bar r, m\in M$  
+Equal to 1 if the charging operation is asssigned to m
+$C_\text{max}\in\mathbb{R}^+$
+
