@@ -6,10 +6,13 @@ from math import ceil
 
 class BinPackingProblem:
 
-    def __init__(self, J: int, e: np.ndarray, b: float) -> None:
-        self.J = J  # Number of jobs
-        self.e = e  # energy requirements
-        self.b = b  # battery limit
+    def __init__(self, energy_requirement: np.ndarray, battery_limit: float, J: int = 0) -> None:
+        if J == 0:
+            self.J = np.shape(energy_requirement)[0]
+        else:
+            self.J = J  # Number of jobs
+        self.e = energy_requirement  # energy requirements
+        self.b = battery_limit  # battery limit
         self.m = None
 
     def solve(self) -> 'BinPackingProblem':
@@ -31,6 +34,8 @@ class BinPackingProblem:
         m.addConstr((chi @ self.e) <= (self.b*gamma))
         m.addConstrs(gamma[r] <= gamma[r-1]
                      for r in range(1, self.J))  # Symmetry breaking
+
+        m.setParam('OutputFlag', 0)
         m.optimize()
         self.m = m
 
@@ -43,3 +48,12 @@ class BinPackingProblem:
             return max(first, second)
         else:
             raise RuntimeError("Forgot to solve first!!!")
+
+
+# e = np.array([50, 3, 48, 53, 53, 4, 3, 41, 23, 20, 52, 49])
+# c = 100
+# n = 12
+
+# bpp = BinPackingProblem(energy_requirement=e, battery_limit=c)
+# bpp.solve()
+# print(bpp.m.ObjVal)
