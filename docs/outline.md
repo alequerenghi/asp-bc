@@ -168,7 +168,7 @@ $\sum_{m\in M}x_j^m=1\qquad \forall j\in J$
 
 $\sum_{j\in J}e_jx_{j}^m\leq b\qquad \forall m\in M$  
 
-$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$
+$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$  
 $C_\text{max}\in\mathbb{R}^+$
 
 This situation arises when the **number of jobs is relatively small** compared to the number of AGVs or the **job energy consumption are low** wrt battery capacity.
@@ -189,7 +189,7 @@ $\sum_{m\in M}\theta_{\bar rm}=1\qquad \forall \bar r\in\bar R$
 All bins are assigned to an AGV
 
 $\theta_{\bar rm}\in\{0,1\}\qquad\forall \bar r, m\in M$  
-Equal to 1 if the charging operation is asssigned to m
+Equal to 1 if the charging operation is asssigned to m  
 $C_\text{max}\in\mathbb{R}^+$
 
 #### Local search
