@@ -7,10 +7,7 @@ from math import ceil
 class BinPackingProblem:
 
     def __init__(self, energy_requirement: np.ndarray, battery_limit: float, J: int = 0) -> None:
-        if J == 0:
-            self.J = np.shape(energy_requirement)[0]
-        else:
-            self.J = J  # Number of jobs
+        self.J = energy_requirement.shape[0] if J == 0 else J  # Number of jobs
         self.e = energy_requirement  # energy requirements
         self.b = battery_limit  # battery limit
         self.m = None
@@ -20,19 +17,19 @@ class BinPackingProblem:
 
         # Binary variables!!!!
         # charging operations
-        gamma = m.addMVar(shape=self.J, vtype=GRB.BINARY)
-        chi = m.addMVar(shape=(self.J, self.J),
-                        vtype=GRB.BINARY)  # transfer jobs
+        self.gamma = m.addMVar(shape=self.J, vtype=GRB.BINARY)
+        self.chi = m.addMVar(shape=(self.J, self.J),
+                             vtype=GRB.BINARY)  # transfer jobs
 
         # Objective
-        m.setObjective(gamma.sum(), GRB.MINIMIZE)
+        m.setObjective(self.gamma.sum(), GRB.MINIMIZE)
 
         # Constraints!!!
         # Assign each job to a charging operation
-        m.addConstr(chi.sum(axis=0) == 1)
+        m.addConstr(self.chi.sum(axis=0) == 1)
         # If charge used, then sum of jobs is lower than capacity
-        m.addConstr((chi @ self.e) <= (self.b*gamma))
-        m.addConstrs(gamma[r] <= gamma[r-1]
+        m.addConstr((self.chi @ self.e) <= (self.b*self.gamma))
+        m.addConstrs(self.gamma[r] <= self.gamma[r-1]
                      for r in range(1, self.J))  # Symmetry breaking
 
         m.setParam('OutputFlag', 0)
