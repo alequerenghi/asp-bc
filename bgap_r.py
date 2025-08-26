@@ -4,6 +4,8 @@ import numpy as np
 from bpp import BinPackingProblem
 from numpy.typing import NDArray
 
+from utility import _array_from_var
+
 
 class BGAPChargeOperations:
     def __init__(self, M: int, energy_requirements: np.ndarray, processing_times: np.ndarray, battery_capacity: float, gamma: NDArray[np.bool], chi: NDArray[np.bool], charge_duration: float, J: int = 0) -> None:
@@ -19,8 +21,8 @@ class BGAPChargeOperations:
 
     @classmethod
     def from_bpp(cls, bpp: BinPackingProblem, M: int, processing_times: np.ndarray, charge_duration: float) -> 'BGAPChargeOperations':
-        gamma = _array_from_var(bpp.gamma)
-        chi = _array_from_var(bpp.chi)
+        gamma = bpp.gamma
+        chi = bpp.chi
         bgap_r = cls(M, bpp.e, processing_times, bpp.b,
                      gamma, chi, charge_duration, bpp.J)
         return bgap_r
@@ -52,7 +54,3 @@ class BGAPChargeOperations:
         self.z = m.ObjVal
 
         return self
-
-
-def _array_from_var(var: gp.MVar) -> NDArray[np.bool]:
-    return np.array(var.X, dtype=np.bool)

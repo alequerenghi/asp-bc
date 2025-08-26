@@ -1,3 +1,4 @@
+from bpp import BinPackingProblem
 import numpy as np
 from bgap_c import BGAPConstrained
 from bgap_r import BGAPChargeOperations
@@ -29,8 +30,8 @@ class LocalSearch:
     @classmethod
     def from_constrained(cls, bgap: BGAPConstrained, t: float) -> 'LocalSearch':
         x = bgap.x
-        y = np.zeros((bgap.J, bgap.J, bgap.M))
-        q = np.zeros((bgap.J, bgap.M))
+        y = np.zeros((bgap.J, bgap.J, bgap.M), dtype=np.bool)
+        q = np.zeros((bgap.J, bgap.M), dtype=np.bool)
         cmax = bgap.z
 
         ls = cls(x, y, q, cmax, bgap.d, t, bgap.e, bgap.b)
@@ -46,16 +47,20 @@ class LocalSearch:
         return ls
 
     def _compute_cm(self) -> np.ndarray:
-        first = self.x @ self.d
-        second = (self.t * self.q)[1:].sum(axis=0)
+        first = self.d @ self.x
+        second = (self.t * self.q)[1:].sum(axis=0, dtype=np.float64)
         return first + second
 
     def _get_best_two(self, cm: np.ndarray, m1: np.int64) -> tuple[np.int64, np.int64]:
         # precompute best cm-s
+        m1_val = cm[m1]
         cm[m1] = -np.inf
         top1 = cm.argmax()  # second best
+        top1_val = cm[top1]
         cm[top1] = -np.inf
         top2 = cm.argmax()  # if m2 == top1 use this
+        cm[m1] = m1_val
+        cm[top1] = top1_val
         return (top1, top2)
 
     def saving_add(self, s_star: float) -> tuple[float, tuple]:
@@ -72,13 +77,14 @@ class LocalSearch:
             for m2 in range(M):
                 if m2 == m1:
                     continue
-                m2_new = cm[m2] + self.d + self.t
+                m2_new = cm[m2] + self.d[j] + self.t
                 cm_max = cm[top2] if m2 == top1 else cm[top1]
                 s_a = max(0, self.cmax-max(m1_new, m2_new, cm_max))
                 if s_a > s_star:
                     s_star = s_a
                     r1 = np.argmax(self.y[:, j, m1] == 1)
-                    r2 = (np.where(self.y[:, :, m2] == 1)[0]).max() + 1
+                    r2 = (np.where(self.y[:, :, m2] == 1)
+                          [0]).max(initial=-1) + 1
                     update = (m1, r1, j, m2, r2, j)
         return (s_star, update)
 
@@ -151,9 +157,9 @@ class LocalSearch:
         self.y[r2, j2, m2] = 0
         self.y[r2, j1, m2] = 1
 
-        transport = self.x @ self.d
-        charges = self.y[1:].sum(axis=0) * self.t
-        self.cmax = transport + charges
+        transport = self.d @ self.x
+        charges = self.q[1:].sum(axis=0) * self.t
+        self.cmax = (transport + charges).max()
         return self
 
     def solve(self):
@@ -169,3 +175,43 @@ class LocalSearch:
                 self.update_best(update)
             else:
                 break
+        return self
+
+
+processing_times = np.array([1, 2, 3, 4])
+energy_requirements = np.array([6, 3, 1, 6])
+charge_time = 2
+battery_capacity = 11
+
+bpp = BinPackingProblem(energy_requirements, battery_capacity)
+bpp.solve()
+print("objective", bpp.zeta)
+print("gamma", bpp.gamma)
+print("chi", bpp.chi)
+print("lower bound:", bpp.get_lower_bound(2, charge_time, processing_times))
+
+bgap = BGAPConstrained(2, energy_requirements,
+                       processing_times, battery_capacity)
+bgap.solve()
+print("objective", bgap.z)
+print("x", bgap.x)
+
+ls = LocalSearch.from_constrained(bgap, charge_time)
+ls.solve()
+
+print("objective", ls.cmax)
+print("x", ls.x)
+print("y:\n", ls.y)
+
+bgap = BGAPChargeOperations.from_bpp(bpp, 2, processing_times, charge_time)
+bgap.solve()
+
+print("objective", bgap.z)
+print("theta", bgap.theta)
+
+ls = LocalSearch.from_charge(bgap)
+ls.solve()
+
+print("objective", ls.cmax)
+print("x", ls.x)
+print("y:\n", ls.y)

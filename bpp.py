@@ -3,6 +3,8 @@ from gurobipy import GRB
 import numpy as np
 from math import ceil
 
+from utility import _array_from_var
+
 
 class BinPackingProblem:
 
@@ -37,8 +39,8 @@ class BinPackingProblem:
         m.setParam('OutputFlag', 0)
         m.optimize()
 
-        self.gamma = gamma
-        self.chi = chi
+        self.gamma = _array_from_var(gamma)
+        self.chi = _array_from_var(chi)
         self.zeta = m.ObjVal
 
         return self
@@ -47,12 +49,3 @@ class BinPackingProblem:
         first = ceil((max(0, self.zeta-M)*t+d.sum())/M)
         second = ceil(max(0, self.zeta-M)/M)*t
         return max(first, second)
-
-
-# e = np.array([50, 3, 48, 53, 53, 4, 3, 41, 23, 20, 52, 49])
-# c = 100
-# n = 12
-
-# bpp = BinPackingProblem(energy_requirement=e, battery_limit=c)
-# bpp.solve()
-# print(bpp.m.ObjVal)
