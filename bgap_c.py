@@ -1,6 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
+from bgap_r import _array_from_var
 
 
 class BGAPConstrained:
@@ -23,11 +24,14 @@ class BGAPConstrained:
 
         # CONSTRAINTS!!!
         m.addConstr(cmax >= self.d @ x)
-        m.addConstr(x.sum(axis=0) == 1)
+        # uguale a m.addConstr(x.sum(axis=0) == 1)
+        m.addConstr(np.ones(self.M) @ x == 1)
         m.addConstr((x @ self.e) <= self.b)
 
         m.setParam('OutputFlag', 0)
         m.optimize()
 
-        self.m = m
+        self.x = _array_from_var(x)
+        self.z = m.ObjVal
+
         return self

@@ -199,8 +199,8 @@ Explore the neighborhood of a solution and consider given $(\hat x,\hat y)$ and 
 **The optimal solution uses a number of charging operations greater than the minimum one**.  
     - $\hat c_m$ as the duration of the transfer process on the $m$-th AGV ($\hat c_m=\sum_{j\in J}d_j\hat x_j^m+\sum_{r\in R\backslash\{1\}}t\hat q_r^m$)
     - $\hat J_m$ as the set of transfer jobs assigned to the $m$-th AGV in the current solution ($\hat J_m=\{j\in J:\hat x_j^m=1\}$)
-    - $s_a(m_1,j,m_2)$ as the **saving** coming by adding job j to $m_1$ to a new charging operation of $m_2$:  
-    $$s_a(m_1,j,m_2)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_m-d_j,\hat c_{m_2}+d_j+t,\hat c_m))$$
+    - $s_a(m_1,j,m_2)$ as the **saving** coming by adding job $j\in\hat J_{m_1}$ to $m_1$ to a new charging operation of $m_2$:  
+    $$s_a(m_1,j,m_2)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_{m_1}-d_j,\hat c_{m_2}+d_j+t,\hat c_m))$$
     + if $j*$ only assigned to a charging operation $r*$ then the expression of the new duration is equal to $\hat c_{m_1^*}-d_j-t$.  
 - **swap**: Replace a transfer job of an AGV with a transfer job of a different AGV  
     - define $s_s(m_1,r_1,j_1,m_2,r_2,j_2)$ as the saving from swapping job $j_1$ from $r_1$ on $m_1$ with job $j_2$ from $r_2$ on $m_2$ without exceeding battery capacity of the two AGVs ($b-\hat b_{r_1}^{m_1}\geq e_{j_2}-e_{j_1}\land b-\hat b_{r_2}^{m_2}\geq e_{j_1}-e_{j_2}$)
