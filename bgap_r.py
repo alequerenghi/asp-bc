@@ -31,7 +31,7 @@ class BGAPChargeOperations:
         m = gp.Model("bgap_r")
 
         R_bar = np.where(self.gamma == 1)[0]
-        D = (self.chi @ self.d)[R_bar]
+        D = (self.chi @ self.d)[R_bar] + self.t
 
         # VARIABLES!!!!
         theta = m.addMVar(shape=(R_bar.shape[0], self.M), vtype=GRB.BINARY)
@@ -41,7 +41,7 @@ class BGAPChargeOperations:
         m.setObjective(cmax, GRB.MINIMIZE)
 
         # CONSTRAINTS!!!
-        m.addConstr(cmax >= (theta @ D)-self.t)
+        m.addConstr(cmax >= (D @ theta)-self.t)
         # uguale a m.addConstr(theta.sum(axis=1) == 1)
         m.addConstr(theta @ np.ones(self.M) == 1)
 

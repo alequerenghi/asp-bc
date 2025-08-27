@@ -31,7 +31,9 @@ class LocalSearch:
     def from_constrained(cls, bgap: BGAPConstrained, t: float) -> 'LocalSearch':
         x = bgap.x
         y = np.zeros((bgap.J, bgap.J, bgap.M), dtype=np.bool)
+        y[0] = x
         q = np.zeros((bgap.J, bgap.M), dtype=np.bool)
+        q[0] = 1
         cmax = bgap.z
 
         ls = cls(x, y, q, cmax, bgap.d, t, bgap.e, bgap.b)
@@ -67,7 +69,7 @@ class LocalSearch:
         M = self.x.shape[1]
         cm = self._compute_cm()
         m1 = np.argmax(cm)
-        J_hat = np.where(self.x[m1] == 1)[0]
+        J_hat = np.where(self.x[:, m1] == 1)[0]
 
         top1, top2 = self._get_best_two(cm, m1)
 
@@ -79,12 +81,13 @@ class LocalSearch:
                     continue
                 m2_new = cm[m2] + self.d[j] + self.t
                 cm_max = cm[top2] if m2 == top1 else cm[top1]
+                if M <= 2:
+                    cm_max = 0
                 s_a = max(0, self.cmax-max(m1_new, m2_new, cm_max))
                 if s_a > s_star:
                     s_star = s_a
                     r1 = np.argmax(self.y[:, j, m1] == 1)
-                    r2 = (np.where(self.y[:, :, m2] == 1)
-                          [0]).max(initial=-1) + 1
+                    r2 = (np.where(self.y[:, :, m2] == 1)[0]).max() + 1
                     update = (m1, r1, j, m2, r2, j)
         return (s_star, update)
 
@@ -105,8 +108,7 @@ class LocalSearch:
                         continue
                     for r2 in np.where(self.q[m2] == 1)[0]:
                         for j2 in np.where(self.y[r2, :, m2])[0]:
-                            if charge_left[m1] >= self.e[j2]-self.e[j1] and charge_left[m2] >= self.e[j1]-self.e[j2]:
-
+                            if charge_left[r1, m1] >= self.e[j2]-self.e[j1] and charge_left[r2, m2] >= self.e[j1]-self.e[j2]:
                                 m1_new = cm[m1] - self.d[j1] + self.d[j2]
                                 m2_new = cm[m2] + self.d[j1] - self.d[j2]
                                 cm_max = cm[top2] if m2 == top1 else cm[top1]
@@ -133,7 +135,7 @@ class LocalSearch:
                 if m2 == m1:
                     continue
                 for r2 in R_hat[m2]:
-                    if charge_left[m2] >= self.e[j]:
+                    if charge_left[r2, m2] >= self.e[j]:
                         m1_new = cm[m1] - self.d[j]
                         m2_new = cm[m2] + self.d[j]
                         cm_max = cm[top2] if m2 == top1 else cm[top1]
@@ -176,42 +178,3 @@ class LocalSearch:
             else:
                 break
         return self
-
-
-processing_times = np.array([1, 2, 3, 4])
-energy_requirements = np.array([6, 3, 1, 6])
-charge_time = 2
-battery_capacity = 11
-
-bpp = BinPackingProblem(energy_requirements, battery_capacity)
-bpp.solve()
-print("objective", bpp.zeta)
-print("gamma", bpp.gamma)
-print("chi", bpp.chi)
-print("lower bound:", bpp.get_lower_bound(2, charge_time, processing_times))
-
-bgap = BGAPConstrained(2, energy_requirements,
-                       processing_times, battery_capacity)
-bgap.solve()
-print("objective", bgap.z)
-print("x", bgap.x)
-
-ls = LocalSearch.from_constrained(bgap, charge_time)
-ls.solve()
-
-print("objective", ls.cmax)
-print("x", ls.x)
-print("y:\n", ls.y)
-
-bgap = BGAPChargeOperations.from_bpp(bpp, 2, processing_times, charge_time)
-bgap.solve()
-
-print("objective", bgap.z)
-print("theta", bgap.theta)
-
-ls = LocalSearch.from_charge(bgap)
-ls.solve()
-
-print("objective", ls.cmax)
-print("x", ls.x)
-print("y:\n", ls.y)

@@ -188,7 +188,7 @@ Subtraction due to initial battery charge
 $\sum_{m\in M}\theta_{\bar rm}=1\qquad \forall \bar r\in\bar R$  
 All bins are assigned to an AGV
 
-$\theta_{\bar rm}\in\{0,1\}\qquad\forall \bar r, m\in M$  
+$\theta_{\bar rm}\in\{0,1\}\qquad\forall \bar r\in\bar R, m\in M$  
 Equal to 1 if the charging operation is asssigned to m  
 $C_\text{max}\in\mathbb{R}^+$
 
