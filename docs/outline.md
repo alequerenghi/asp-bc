@@ -113,7 +113,6 @@ $$x_j^m\in\{0,1\}\qquad\forall m\in M,j\in J$$
 $$q_r^m\in\{0,1\}\qquad\forall m\in M,r\in R\backslash\{1\}$$
 $$y_{jr}^m\in\{0,1\}\qquad\forall m\in M,j\in J,r\in R$$
 $$C_\text{max}\in\mathbb{R}^+$$
-
 Consider residual energy in charging time wrt $\tau$ the charging time per energy unit:
 $C_\text{max}\geq \sum_{j\in J}d_jx_j^m+\tau\sum_{j\in J}\sum_{r\in R\backslash\{n\}}e_jy_{jr}^mq_{r+1}^m\qquad \forall m\in M$  
 The first term is transfer time and the second represent the time of charging operations depending on residual energy.  
@@ -209,7 +208,7 @@ Explore the neighborhood of a solution and consider given $(\hat x,\hat y)$ and 
     - $\hat R_m$ the set of charging operations assigned to the $m$-th AGV in the current solution ($\hat R_m=\{r\in R:\hat q_r^m=1\}$)
     - $\hat b_r^m$ the energy required by the transfer jobs assigned to the r-th charging operation of the m-th AGV ($\hat b_r^m=\sum_{j\in \hat J_m}e_j\hat y_{jr}^m$)
     - $s_r(m_1,j,m_2,r)$ is the saving coming from removing job j from $m_1$ and assigning it to the charging operation $r$ of $m_2$ without exceeding battery capacity ($b-\hat b_r^m\geq e_j$):
-    $$s_r(m_1,j,m_2,r)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_m-d_j,\hat c_{m_2}+d_j,\hat c_m))$$
+    $$s_r(m_1,j,m_2,r)=\max(0,\hat C_\text{max}-\max_{m\in M\backslash\{m_1,m_2\}}(\hat c_{m_1}-d_j,\hat c_{m_2}+d_j,\hat c_m))$$
     * if job $j^*$ is the only one assigned to charging operation $r^*$ on $m_1^*$ then the expression of the related transfer process has to be modified
     
 #### Implementation details
@@ -233,3 +232,51 @@ the numerator represents the total time required by all machines to perform all 
 2. Charge job duration has to be modified ($D_{\bar r}=\sum_{j\in J}(d_j+\tau e_j)\bar \chi_{\hat rj}$).  
 The first constraint has to be adapted to ignore the charging time of the last charging job
 3. Saving expressions must be modified to consider the variable charging time.
+
+## Computational Experiments
+
+Experiments on `i7-6500U` 2.5GHz with `8` GB of RAM. Solved with `Gurobi 9.1`.  
+**Time limit of `1800s`** for `BGAP-A` and `720s` for all the others.
+
+### Test Instances
+
+M = {2, 5, 10}  
+J = {50, 100, 150, 200}
+
+Energy consumption and duration from standard distribution from real data. Duration is very heterogeneous.
+
+d = $\mathcal N(\mu_d, (\mu_d/2)^2)$ 
+$\mu_d \in \{10, 20, 30\}$
+e = $\mathcal N(\mu_e, (\mu_e/2)^2)$
+$\mu_e\in\{1,2,4\}$
+
+b = 10
+
+Performance of approach is not affected by correlation between job duration and energy consumption.
+
+### Small and Medium Instances
+
+Up to 150 jobs.  
+Exact approach reaches optimality in almost all instances. More difficult with higher energy consumption (more charges required).  
+
+Matheuristic is not affected by average consumption and/or duration.  
+Local search effectively reduces the gap.  
+Most time is spent in phase 1. Phase 3 takes little time to complete.
+
+With 100 jobs, solve with low energy consumption. High energy consumption hits the time limit.
+
+With 150 jobs, exact approach solves only with 2 AGVs.  
+In matheuristic BPP is not solved to optimality:
+- could result in higher gap (lower lower bound)
+- gap decreases when jobs increase: many jobs require charge -> BPP solution has minor impact
+
+### Larger instances
+
+Impossible with exact approach.  
+No gap because only lower bound available is from BPP.  
+**Battery level usually depleted before recharge (5%). This confirms the assumption on the fixed charge time**.
+
+### Comparison
+
+Masone et al. (2021) can solve only instances with 50 jobs.  
+wrt CSA (manufactorer approach) ASP-BC is 10% better average and 40% maximum ASP-BC but a little slower.
