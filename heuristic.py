@@ -6,10 +6,10 @@ from local_search import LocalSearch
 
 
 class MathEuristic:
-    def __init__(self, M: int, energy_requirements: np.ndarray, computation_times: np.ndarray, battery_capacity: float, charge_time: float) -> None:
+    def __init__(self, M: int, energy_requirements: np.ndarray, computation_times: list, battery_capacity: float, charge_time: float) -> None:
         self.M = M
         self.e = energy_requirements
-        self.d = computation_times
+        self.d = np.array(computation_times, dtype=float)
         self.b = battery_capacity
         self.t = charge_time
 
@@ -31,7 +31,7 @@ class MathEuristic:
         return self
 
 
-processing_times = np.array([1, 2, 3, 4])
+processing_times = [1, 2, 3, 4]
 energy_requirements = np.array([6, 3, 1, 6])
 charge_time = 2
 battery_capacity = 11
