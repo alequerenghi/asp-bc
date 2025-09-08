@@ -8,27 +8,23 @@ from utility import _array_from_var
 
 
 class BGAPChargeOperations:
-    def __init__(self, M: int, energy_requirements: np.ndarray, processing_times: np.ndarray, battery_capacity: float, gamma: NDArray[np.bool], chi: NDArray[np.bool], charge_duration: float, J: int = 0) -> None:
+    def __init__(self, M: int, processing_times: NDArray[np.int64], gamma: NDArray[np.bool_], chi: NDArray[np.bool_], charge_duration: float, R=0) -> None:
         self.M = M
-        self.e = energy_requirements
         self.d = processing_times
-        self.b = battery_capacity
         self.gamma = gamma
         self.chi = chi
         self.t = charge_duration
-        self.J = energy_requirements.shape[0] if J == 0 else J
-        self.R = self.J
+        self.R = R if R != 0 else processing_times.shape[0]
 
     @classmethod
     def from_bpp(cls, bpp: BinPackingProblem, M: int, processing_times: np.ndarray, charge_duration: float) -> 'BGAPChargeOperations':
-        gamma = bpp.gamma
-        chi = bpp.chi
-        bgap_r = cls(M, bpp.e, processing_times, bpp.b,
-                     gamma, chi, charge_duration, bpp.J)
+        gamma = bpp.gamma  # (J, )
+        chi = bpp.chi      # (R, J)
+        bgap_r = cls(M, processing_times, gamma, chi, charge_duration, bpp.R)
         return bgap_r
 
-    def solve(self) -> 'BGAPChargeOperations':
-        m = gp.Model("bgap_r")
+    def solve(self, env=None) -> 'BGAPChargeOperations':
+        m = gp.Model("bgap_r", env)
 
         R_bar = np.where(self.gamma == 1)[0]
         D = (self.chi @ self.d)[R_bar] + self.t
@@ -45,12 +41,11 @@ class BGAPChargeOperations:
         # uguale a m.addConstr(theta.sum(axis=1) == 1)
         m.addConstr(theta @ np.ones(self.M) == 1)
 
-        m.setParam('OutputFlag', 0)
         m.optimize()
 
-        self.theta = np.zeros((self.R, self.M), dtype=np.bool)
+        self.theta = np.zeros((self.R, self.M), dtype=bool)
         self.theta[R_bar] = _array_from_var(theta)
-        # np.add.at(self.theta, R_bar, _array_from_var(theta))
         self.z = m.ObjVal
+        self.time = m.Runtime
 
         return self
