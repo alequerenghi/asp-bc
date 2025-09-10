@@ -1,4 +1,4 @@
-from model import ASPBC
+from aspbc import ASPBC
 import gurobipy as gb
 import os
 

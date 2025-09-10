@@ -4,7 +4,7 @@ import numpy as np
 from math import ceil
 from numpy.typing import NDArray
 
-from utility import _array_from_var
+from aspbc.utility import _array_from_var
 
 
 class BinPackingProblem:

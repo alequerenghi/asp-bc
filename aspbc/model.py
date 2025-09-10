@@ -3,11 +3,8 @@ import os
 from numpy.typing import NDArray
 import gurobipy as gb
 from gurobipy import GRB, quicksum
-from bgap_c import BGAPConstrained
-from bgap_r import BGAPChargeOperations
-from bpp import BinPackingProblem
-from local_search import LocalSearch
-from parser import parse_file
+from .heuristic import BinPackingProblem, BGAPConstrained, BGAPChargeOperations, LocalSearch
+from aspbc.parser import parse_file
 from csv import writer
 
 

@@ -1,7 +1,7 @@
 import time
 import numpy as np
-from bgap_c import BGAPConstrained
-from bgap_r import BGAPChargeOperations
+from .bgap_c import BGAPConstrained
+from .bgap_r import BGAPChargeOperations
 from numpy.typing import NDArray
 # x = transfer job j performed by m
 # q = charge jobe r performed by m
