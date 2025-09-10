@@ -22,7 +22,7 @@ with gb.Env() as env_model:
             path = os.path.join(folder, file)
             model = ASPBC.create_from_file(path)
             print(
-                f"Instance {file} with {model.M} AGVs and {model.J} jobs")
+                f"Instance {file} with {model.M} AGVs and {model.e.shape[0]} jobs")
             model.solve(env_model)
             print(
                 f"\n\nModel:\nLower bound: {model.aspbc.ObjVal}, Upper bound: {model.aspbc.ObjBound}, GAP: {model.aspbc.MIPGap}, Runtime: {model.aspbc.Runtime:.2f}")

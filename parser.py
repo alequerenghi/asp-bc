@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def parse_file(filepath) -> tuple[int, int, NDArray[np.int64], float, float, NDArray[np.float64]]:
+def parse_file(filepath) -> tuple[int, NDArray[np.int64], float, float, NDArray[np.float64]]:
     with open(filepath, "r") as f:
         instance = f.read()
 
@@ -32,7 +32,7 @@ def parse_file(filepath) -> tuple[int, int, NDArray[np.int64], float, float, NDA
     assert len(
         energy_requirements) == job_number, f"Mismatch: expected {job_number} jobs, got {len(energy_requirements)}"
 
-    return (job_number, agv_number, job_durations, battery_capacity, charge_duration, energy_requirements)
+    return (agv_number, job_durations, battery_capacity, charge_duration, energy_requirements)
 
 
 if __name__ == "__main__":
