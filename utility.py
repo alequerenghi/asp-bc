@@ -3,5 +3,5 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def _array_from_var(var: gp.MVar) -> NDArray[np.bool]:
-    return np.array(var.X, dtype=np.bool)
+def _array_from_var(var: gp.MVar) -> NDArray[np.bool_]:
+    return np.array(var.X, dtype=bool)

@@ -2,21 +2,22 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from utility import _array_from_var
+from numpy.typing import NDArray
 
 
 class BGAPConstrained:
-    def __init__(self, M: int, energy_requirements: np.ndarray, processing_times: np.ndarray, battery_capacity: float, J: int = 0) -> None:
+    def __init__(self, M: int, energy_requirements: NDArray[np.float64], processing_times: NDArray[np.int64], battery_capacity: float) -> None:
         self.M = M
         self.e = energy_requirements
         self.d = processing_times
         self.b = battery_capacity
-        self.J = energy_requirements.shape[0] if J == 0 else J
 
-    def solve(self) -> 'BGAPConstrained':
-        m = gp.Model("bgap_c")
+    def solve(self, env=None) -> 'BGAPConstrained':
+        J = self.e.shape[0]
+        m = gp.Model("bgap_c", env)
 
         # VARIABLES!!!!
-        x = m.addMVar(shape=(self.J, self.M), vtype=GRB.BINARY)
+        x = m.addMVar(shape=(J, self.M), vtype=GRB.BINARY)
         cmax = m.addVar()
 
         # OBJECTIVE!!!
@@ -28,10 +29,10 @@ class BGAPConstrained:
         m.addConstr(x @ np.ones(self.M) == 1)
         m.addConstr(self.e @ x <= self.b)
 
-        m.setParam('OutputFlag', 0)
         m.optimize()
 
         self.x = _array_from_var(x)
         self.z = m.ObjVal
+        self.time = m.Runtime
 
         return self

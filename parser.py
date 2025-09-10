@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def parse_file(filepath) -> tuple[int, int, NDArray[np.int64], float, float, NDArray[np.float64]]:
+def parse_file(filepath) -> tuple[int, NDArray[np.int64], float, float, NDArray[np.float64]]:
     with open(filepath, "r") as f:
         instance = f.read()
 
@@ -24,15 +24,15 @@ def parse_file(filepath) -> tuple[int, int, NDArray[np.int64], float, float, NDA
                for line in W_block.strip().splitlines() if line.strip()]
     W = [[float(x) for x in re.split(r"\s+", line)] for line in W_lines]
 
-    job_durations = np.array(D)[:, 0]
-    energy_requirements = np.array(W)[:, 0]
+    job_durations = np.array(D, dtype=np.int64)[:, 0]
+    energy_requirements = np.array(W, dtype=np.float64)[:, 0]
 
     assert len(
         job_durations) == job_number, f"Mismatch: expected {job_number} jobs, got {len(job_durations)}"
     assert len(
         energy_requirements) == job_number, f"Mismatch: expected {job_number} jobs, got {len(energy_requirements)}"
 
-    return (job_number, agv_number, job_durations, battery_capacity, charge_duration, energy_requirements)
+    return (agv_number, job_durations, battery_capacity, charge_duration, energy_requirements)
 
 
 if __name__ == "__main__":
