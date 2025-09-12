@@ -71,9 +71,9 @@ class LocalSearch:
         while True:
             print(self._compute_cm())
             s_star = (0.0, ())  # saving time
-            s_star = self.saving_add(*s_star)
-            s_star = self.save_remove(*s_star)
             s_star = self.save_swap(*s_star)
+            s_star = self.save_remove(*s_star)
+            s_star = self.saving_add(*s_star)
             if s_star[0] > 0.0:
                 update = s_star[1]
                 self.update_best(update)
