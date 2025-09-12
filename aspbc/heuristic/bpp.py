@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from numpy.typing import NDArray
-from utility import _array_from_var
+from aspbc.utility import _array_from_var
 
 
 class BinPackingProblem:

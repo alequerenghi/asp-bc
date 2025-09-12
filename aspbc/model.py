@@ -3,8 +3,9 @@ from numpy.typing import NDArray
 import gurobipy as gb
 from gurobipy import GRB, quicksum
 from .heuristic import BinPackingProblem, BGAPConstrained, BGAPChargeOperations, LocalSearch
-from aspbc.parser import parse_file
+from .parser import parse_file
 from math import ceil
+
 
 class ASPBC:
     def __init__(self,
@@ -80,7 +81,7 @@ class ASPBC:
 
         local_search = None
         # se numero ricariche necessarie <= numero di AGV
-        if bpp.zeta <= self.M: 
+        if bpp.zeta <= self.M:
             bgap = BGAPConstrained(self.M, self.e, self.d, self.b)
             bgap.solve(env)
             local_search = LocalSearch.from_constrained(bgap, self.t, self.R)
@@ -99,8 +100,9 @@ class ASPBC:
         self.gap = (self.ub - self.lb)/self.lb
 
         return self
-    
+
     def get_bpp_lower_bound(self, bpp: BinPackingProblem) -> float:
-        first = ceil((max(0, bpp.zeta - self.M) * self.t + self.d.sum()) / self.M)
+        first = ceil((max(0, bpp.zeta - self.M) *
+                     self.t + self.d.sum()) / self.M)
         second = ceil(max(0, bpp.zeta - self.M) / self.M) * self.t
         return max(first, second)

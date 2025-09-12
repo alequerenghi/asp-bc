@@ -69,7 +69,6 @@ class LocalSearch:
     def solve(self):
         t0 = time.time()
         while True:
-            print(self._compute_cm())
             s_star = (0.0, ())  # saving time
             s_star = self.save_swap(*s_star)
             s_star = self.save_remove(*s_star)
