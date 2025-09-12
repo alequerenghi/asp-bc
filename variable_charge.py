@@ -1,6 +1,3 @@
-
-
-import os
 from gurobipy import GRB
 import scipy.sparse as sp
 import numpy as np
@@ -8,13 +5,14 @@ import gurobipy as gb
 from gurobipy import quicksum
 from numpy.typing import NDArray
 from parser import parse_file
-import csv
-
 
 class ASPBC:
-    def __init__(self, agv_number: int, job_durations: NDArray[np.int64],
-                 battery_capacity: float, charge_duration: float, energy_requirements: NDArray[np.float64],
-                 charging_operations_number=0
+    def __init__(self, agv_number: int, 
+                 job_durations: NDArray[np.int64],
+                 battery_capacity: float, 
+                 charge_duration: float, 
+                 energy_requirements: NDArray[np.float64],
+                 charging_operations_number = 0
                  ) -> None:
         self.M = agv_number
         self.d = job_durations
@@ -48,14 +46,11 @@ class ASPBC:
         model.optimize()
 
         self.aspbc = model
-
         return self
 
     @classmethod
     def create_from_file(cls, file_name: str) -> "ASPBC":
-        return cls(*parse_file(
-            file_name))
-
+        return cls(*parse_file(file_name))
 
 if __name__ == "__main__":
     with gb.Env() as env:

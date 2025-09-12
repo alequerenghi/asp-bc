@@ -1,41 +1,38 @@
 import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
-from math import ceil
 from numpy.typing import NDArray
-
 from aspbc.utility import _array_from_var
-
 
 class BinPackingProblem:
 
-    def __init__(self, energy_requirement: NDArray[np.float64], battery_limit: float, R: int = 0) -> None:
-        self.R = R if R != 0 else energy_requirement.shape[0]
-        self.e = energy_requirement  # energy requirements
-        self.b = battery_limit  # battery limit
+    def __init__(self, job_costs: NDArray[np.float64], 
+                 battery_capacity: float, 
+                 number_of_charges: int = 0
+                 ) -> None:
+        self.R = number_of_charges if number_of_charges != 0 else job_costs.shape[0]
+        self.e = job_costs
+        self.b = battery_capacity
 
     def solve(self, env=None) -> 'BinPackingProblem':
         J = self.e.shape[0]
-        m = gp.Model("bpp", env=env)
+        m = gp.Model("BPP", env=env)
 
         # Binary variables!!!!
-        # charging operations
-        gamma = m.addMVar(shape=self.R, vtype=GRB.BINARY)
-        chi = m.addMVar(shape=(self.R, J),
-                        vtype=GRB.BINARY)  # transfer jobs
+        gamma = m.addMVar(self.R, vtype=GRB.BINARY) # numero di bin
+        chi = m.addMVar((self.R, J), vtype=GRB.BINARY)  # job j asseganto a bin r
 
         # Objective
         # uguale a m.setObjective(gamma.sum(), GRB.MINIMIZE)
         m.setObjective(gamma @ np.ones(self.R), GRB.MINIMIZE)
 
         # Constraints!!!
-        # Assign each job to a charging operation
+        # Assign each job to a charging operation aka ogni job usato una ed un'unica volta
         # uguale a m.addConstr(chi.sum(axis=0) == 1)
         m.addConstr(np.ones(self.R) @ chi == 1)
-        # If charge used, then sum of jobs is lower than capacity
-        m.addConstr((chi @ self.e) <= (self.b*gamma))
-        m.addConstrs(gamma[r] <= gamma[r-1]
-                     for r in range(1, self.R))  # Symmetry breaking
+        # If charge used, then sum of jobs must be lower than capacity aka non riempire i bin più della loro capacità
+        m.addConstr((chi @ self.e) <= (self.b * gamma))
+        m.addConstrs(gamma[r] <= gamma[r-1] for r in range(1, self.R))
 
         m.optimize()
 
@@ -45,8 +42,3 @@ class BinPackingProblem:
         self.time = m.Runtime
 
         return self
-
-    def get_lower_bound(self, M: int, t: float, d: np.ndarray) -> float:
-        first = ceil((max(0, self.zeta-M)*t+d.sum())/M)
-        second = ceil(max(0, self.zeta-M)/M)*t
-        return max(first, second)

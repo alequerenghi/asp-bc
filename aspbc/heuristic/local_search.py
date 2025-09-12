@@ -13,46 +13,76 @@ from numpy.typing import NDArray
 # x = chi.T @ theta (J, M)
 # y = np.stack([np.outer(chi[r], theta[r]) for r in range(R)], axis = 0) (R, J, M)
 
-
 class LocalSearch:
-
-    def __init__(self, x: NDArray[np.bool_], y: NDArray[np.bool_], q: NDArray[np.bool_], cmax: float, processing_times: NDArray[np.int64], charge_duration: float, energy_requirement: NDArray[np.float64], battery_capacity: float) -> None:
+    def __init__(self, 
+                 x: NDArray[np.bool_], 
+                 y: NDArray[np.bool_], 
+                 q: NDArray[np.bool_], 
+                 cmax: float, 
+                 job_durations: NDArray[np.int64], 
+                 energy_job_costs: NDArray[np.float64], 
+                 charge_duration: float, 
+                 battery_capacity: float
+                 ) -> None:
         self.x = x  # (J, M)
         self.y = y  # (R, J, M)
         self.q = q  # (R, M)
         self.cmax = cmax
-        self.d = processing_times
+        self.d = job_durations
         self.t = charge_duration
-        self.e = energy_requirement
+        self.e = energy_job_costs
         self.b = battery_capacity
 
     @classmethod
-    def from_constrained(cls, bgap: BGAPConstrained, t: float, R=0) -> 'LocalSearch':
+    def from_constrained(cls, 
+                         bgap: BGAPConstrained, 
+                         charge_duration: float, 
+                         charging_operations_number=0
+                         ) -> 'LocalSearch':
         J = bgap.x.shape[0]
-        R = R if R != 0 else J
+        R = charging_operations_number if charging_operations_number != 0 else J
         x = bgap.x
         y = np.zeros((R, J, bgap.M), dtype=bool)
-        y[0] = x
+        y[0,:,:] = x
         q = np.zeros((J, bgap.M), dtype=bool)
-        q[0] = 1
+        q[0,:] = 1
         cmax = bgap.z
 
-        ls = cls(x, y, q, cmax, bgap.d, t, bgap.e, bgap.b)
+        ls = cls(x, y, q, cmax, bgap.d, bgap.e, charge_duration, bgap.b)
         return ls
 
     @classmethod
-    def from_charge(cls, bgap: BGAPChargeOperations, energy_requirements: NDArray[np.float64], battery_capacity: float) -> 'LocalSearch':
+    def from_charge(cls, 
+                    bgap: BGAPChargeOperations, 
+                    energy_job_costs: NDArray[np.float64], 
+                    battery_capacity: float
+                    ) -> 'LocalSearch':
         # chi = transfer operation j assigned to charge operation r
         # theta = charge operation r assigned to m
         x = bgap.chi.T @ bgap.theta
         y = np.stack([np.outer(bgap.chi[r], bgap.theta[r])
                      for r in range(bgap.theta.shape[0])], axis=0)
-        ls = cls(x, y, bgap.theta, bgap.z, bgap.d, bgap.t,
-                 energy_requirements, battery_capacity)
-        # ls.cmax = ls._compute_cm().max()
+        ls = cls(x, y, bgap.theta, bgap.z, bgap.d,
+                 energy_job_costs, bgap.t, battery_capacity)
         return ls
+    
+    def solve(self):
+        t0 = time.time()
+        while True:
+            s_star = (0.0, ()) # saving time
+            s_star = self.saving_add(*s_star)
+            s_star = self.save_remove(*s_star)
+            s_star = self.save_swap(*s_star)
+            if s_star[0] > 0.0:
+                update = s_star[1]
+                self.update_best(update)
+            else:
+                break
+        self.time = time.time() - t0
+        return self
 
-    def _compute_cm(self) -> np.ndarray:
+    def _compute_cm(self) -> np.ndarray[float]:
+        # quanto tempo impiega ogni AGV a svolgere il suo lavoro
         first = self.d @ self.x
         second = (self.t * self.q).sum(axis=0, dtype=np.float64) - self.t
         return first + second
@@ -70,28 +100,27 @@ class LocalSearch:
         return (top1, top2)
 
     def saving_add(self, s_star: float, update: tuple) -> tuple[float, tuple]:
-        M = self.x.shape[1]
-        cm = self._compute_cm()  # duration for each AGV
-        critical_machines = np.where(cm == cm.max())[0]
-        np.random.shuffle(critical_machines)
+        fleet_size = self.x.shape[1]
+        c_m = self._compute_cm()  # duration for all AGVs
+        critical_machines = np.where(c_m == c_m.max())[0]
 
         for m1 in critical_machines:
-            top1, top2 = self._get_best_two(cm, m1)
+            top1, top2 = self._get_best_two(c_m, m1)
             # iterate jobs of most loaded AGV
             for j in np.where(self.x[:, m1] == 1)[0]:
-                m1_new = cm[m1] - self.d[j]
+                m1_without_j = c_m[m1] - self.d[j]
                 # find another AGV
-                for m2 in range(M):
+                for m2 in range(fleet_size):
                     if m2 == m1:
                         continue
                     # Consider the cost of doing the job and a new charge
-                    m2_new = cm[m2] + self.d[j] + self.t
-                    if M <= 2:
-                        cm_max = 0
+                    m2_with_j = c_m[m2] + self.d[j] + self.t
+                    if fleet_size <= 2:
+                        cm_max = 0 # cm più alto che non è ne m1 ne m2
                     else:
-                        cm_max = cm[top2] if m2 == top1 else cm[top1]
+                        cm_max = c_m[top1] if m2 != top1 else c_m[top2]
                     # Compute saving
-                    s_a = max(0, self.cmax-max(m1_new, m2_new, cm_max))
+                    s_a = max(0, self.cmax - max(m1_without_j, m2_with_j, cm_max))
                     # If you save time
                     if s_a > s_star:
                         s_star = s_a
@@ -188,19 +217,4 @@ class LocalSearch:
         self.q[r2, m2] = self.y[r2, :, m2].max()
 
         self.cmax = self._compute_cm().max()
-        return self
-
-    def solve(self):
-        t0 = time.time()
-        while True:
-            s_star = (0.0, ())
-            s_star = self.saving_add(*s_star)
-            s_star = self.save_remove(*s_star)
-            s_star = self.save_swap(*s_star)
-            if s_star[0] > 0.0:
-                update = s_star[1]
-                self.update_best(update)
-            else:
-                break
-        self.time = time.time() - t0
         return self

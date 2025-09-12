@@ -1,41 +1,39 @@
 import numpy as np
-import os
 from numpy.typing import NDArray
 import gurobipy as gb
 from gurobipy import GRB, quicksum
 from .heuristic import BinPackingProblem, BGAPConstrained, BGAPChargeOperations, LocalSearch
 from aspbc.parser import parse_file
-from csv import writer
-
+from math import ceil
 
 class ASPBC:
     def __init__(self,
-                 agv_number: int,
+                 fleet_size: int,
                  job_durations: NDArray[np.int64],
                  battery_capacity: float,
                  charge_duration: float,
-                 energy_requirements: NDArray[np.float64],
+                 energy_job_costs: NDArray[np.float64],
                  charging_operations_number: int = 0
                  ) -> None:
-        self.M = agv_number
+        self.M = fleet_size
         self.d = job_durations
         self.b = battery_capacity
         self.t = charge_duration
-        self.e = energy_requirements
-        self.R = energy_requirements.shape[0] if charging_operations_number == 0 else charging_operations_number
+        self.e = energy_job_costs
+        self.R = energy_job_costs.shape[0] if charging_operations_number == 0 else charging_operations_number
 
-    def solve(self, env=None) -> "ASPBC":
+    @classmethod
+    def create_from_file(cls, file_name: str) -> "ASPBC":
+        return cls(*parse_file(file_name))
+
+    def solve(self, env=None) -> 'ASPBC':
         J = self.e.shape[0]
         aspbc = gb.Model("ASP-BC", env=env)
 
-        x = aspbc.addVars([(j, m) for j in range(J)
-                          for m in range(self.M)], vtype=GRB.BINARY)
-        q = aspbc.addVars([(r, m) for r in range(self.R)
-                          for m in range(self.M)], vtype=GRB.BINARY)
-        y = aspbc.addVars([(j, r, m) for j in range(J) for r in range(
-            self.R) for m in range(self.M)], vtype=GRB.BINARY)
-
-        cmax = aspbc.addVar(vtype=GRB.CONTINUOUS, lb=0.0)
+        x = aspbc.addVars(J, self.M, vtype=GRB.BINARY)
+        q = aspbc.addVars(self.R, self.M, vtype=GRB.BINARY)
+        y = aspbc.addVars(J, self.R, self.M, vtype=GRB.BINARY)
+        cmax = aspbc.addVar()
 
         aspbc.setObjective(cmax, GRB.MINIMIZE)
 
@@ -66,33 +64,36 @@ class ASPBC:
                          for m in range(self.M)
                          )
         aspbc.optimize()
-
         self.aspbc = aspbc
-
         return self
 
     def solve_matheuristic(self, env=None):
         bpp = BinPackingProblem(self.e, self.b)
         bpp.solve(env)
         self.time_1 = bpp.time
-        self.lb = bpp.get_lower_bound(self.M, self.t, self.d)
-        ls = None
-        if bpp.zeta <= self.M:
+        self.lb = self.get_bpp_lower_bound(bpp)
+
+        local_search = None
+        # se numero ricariche necessarie <= numero di AGV
+        if bpp.zeta <= self.M: 
             bgap = BGAPConstrained(self.M, self.e, self.d, self.b)
             bgap.solve(env)
-            ls = LocalSearch.from_constrained(bgap, self.t)
+            local_search = LocalSearch.from_constrained(bgap, self.t, self.R)
         else:
             bgap = BGAPChargeOperations.from_bpp(bpp, self.M, self.d, self.t)
             bgap.solve(env)
-            ls = LocalSearch.from_charge(bgap, self.e, self.b)
-        self.time_2 = bgap.time
-        self.initial_ub = bgap.z
-        ls.solve()
-        self.ub = ls.cmax
-        self.time_3 = ls.time
-        return self
+            local_search = LocalSearch.from_charge(bgap, self.e, self.b)
 
-    @classmethod
-    def create_from_file(cls, file_name: str) -> "ASPBC":
-        return cls(*parse_file(
-            file_name))
+        self.time_2 = bgap.time
+        self.initial_ub = bgap.z # l'upper bound iniziale è l'ottimo del BGAP
+
+        local_search.solve()
+        self.ub = local_search.cmax
+        self.time_3 = local_search.time
+
+        return self
+    
+    def get_bpp_lower_bound(self, bpp: BinPackingProblem) -> float:
+        first = ceil((max(0, bpp.zeta - self.M) * self.t + self.d.sum()) / self.M)
+        second = ceil(max(0, bpp.zeta - self.M) / self.M) * self.t
+        return max(first, second)

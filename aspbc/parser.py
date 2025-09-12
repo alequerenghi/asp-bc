@@ -3,7 +3,6 @@ import re
 import numpy as np
 from numpy.typing import NDArray
 
-
 def parse_file(filepath) -> tuple[int, NDArray[np.int64], float, float, NDArray[np.float64]]:
     with open(filepath, "r") as f:
         instance = f.read()
@@ -33,7 +32,3 @@ def parse_file(filepath) -> tuple[int, NDArray[np.int64], float, float, NDArray[
         energy_requirements) == job_number, f"Mismatch: expected {job_number} jobs, got {len(energy_requirements)}"
 
     return (agv_number, job_durations, battery_capacity, charge_duration, energy_requirements)
-
-
-if __name__ == "__main__":
-    parse_file("dataset/ASP-BC Instances/Ins_V10_J200_T30_R60_B10_W2_S357_N7.txt")
