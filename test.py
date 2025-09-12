@@ -18,18 +18,13 @@ for file in files[0:20]:
       print(f"\n\nInstance {file} with {model.M} AGVs and {model.e.shape[0]} jobs")
       
       model.solve(env)
-      print(f"\n\nExact approach:\nBest solution: {model.aspbc.ObjVal}",
-            f"\nOptimal solution reached" if model.aspbc.MIPGap == 0.0 else f"GAP from optimal solution: {model.aspbc.MIPGap}",
-            f"\nRuntime: {model.aspbc.Runtime:.2f} seconds")
+      print(f"\n\nExact approach:\nFound solution: {model.lb} s",
+            f"\nOptimal solution reached" if model.gap == 0.0 else f"\nGAP from optimal solution: {model.gap} %",
+            f"\nRuntime: {model.time:.2f} s")
  
       model.solve_matheuristic(env)
-      print(f"\n\nMatheuristic:\nLower bound: {model.lb}, "
-            f"Time step 1: {model.time_1:.2f}, "
-            f"Initial Upper bound: {model.initial_ub}, "
-            f"Initial GAP: {round((model.initial_ub-model.lb)/model.lb * 100, 2)}, "
-            f"Time step 2: {model.time_2:.2f}, Upper Bound: {model.ub}, "
-            f"GAP: {round((model.ub-model.lb)/model.lb*100, 2)}, "
-            f"Time step 3: {model.time_3:.2f}, "
-            f"Total time: {model.time_1 + model.time_2 + model.time_3:.2f}")
+      print(f"\n\nMatheuristic:\nFound solution: {model.ub} s",
+            f"\nOptimal solution reached" if model.ub-model.lb == 0.0 else f"\nGAP from optimal solution: {round((model.ub-model.lb)/model.lb*100, 2)} %",
+            f"\nRuntime: {model.time:.2f} s")
 
       print("\n\n=====================================")

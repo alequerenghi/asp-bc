@@ -81,7 +81,7 @@ class LocalSearch:
         self.time = time.time() - t0
         return self
 
-    def _compute_cm(self) -> np.ndarray[float]:
+    def _compute_cm(self) -> NDArray[np.float64]:
         # quanto tempo impiega ogni AGV a svolgere il suo lavoro
         first = self.d @ self.x
         second = (self.t * self.q).sum(axis=0, dtype=np.float64) - self.t

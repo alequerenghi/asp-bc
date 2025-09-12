@@ -2,7 +2,6 @@ from gurobipy import GRB
 import scipy.sparse as sp
 import numpy as np
 import gurobipy as gb
-from gurobipy import quicksum
 from numpy.typing import NDArray
 from parser import parse_file
 

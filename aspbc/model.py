@@ -64,13 +64,18 @@ class ASPBC:
                          for m in range(self.M)
                          )
         aspbc.optimize()
-        self.aspbc = aspbc
+
+        self.time = aspbc.Runtime
+        self.ub = aspbc.ObjBound
+        self.lb = aspbc.ObjVal
+        self.gap = aspbc.MIPGap
+
         return self
 
     def solve_matheuristic(self, env=None):
         bpp = BinPackingProblem(self.e, self.b)
         bpp.solve(env)
-        self.time_1 = bpp.time
+        self.time = bpp.time
         self.lb = self.get_bpp_lower_bound(bpp)
 
         local_search = None
@@ -84,12 +89,14 @@ class ASPBC:
             bgap.solve(env)
             local_search = LocalSearch.from_charge(bgap, self.e, self.b)
 
-        self.time_2 = bgap.time
-        self.initial_ub = bgap.z # l'upper bound iniziale è l'ottimo del BGAP
+        self.time += bgap.time
 
         local_search.solve()
+
         self.ub = local_search.cmax
-        self.time_3 = local_search.time
+        self.time += local_search.time
+        self.lb = self.get_bpp_lower_bound(bpp)
+        self.gap = (self.ub - self.lb)/self.lb
 
         return self
     
