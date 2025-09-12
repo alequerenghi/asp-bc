@@ -2,12 +2,13 @@ import gurobipy as gp
 from gurobipy import GRB
 import numpy as np
 from numpy.typing import NDArray
-from aspbc.utility import _array_from_var
+from utility import _array_from_var
+
 
 class BinPackingProblem:
 
-    def __init__(self, job_costs: NDArray[np.float64], 
-                 battery_capacity: float, 
+    def __init__(self, job_costs: NDArray[np.float64],
+                 battery_capacity: float,
                  number_of_charges: int = 0
                  ) -> None:
         self.R = number_of_charges if number_of_charges != 0 else job_costs.shape[0]
@@ -19,8 +20,9 @@ class BinPackingProblem:
         m = gp.Model("BPP", env=env)
 
         # Binary variables!!!!
-        gamma = m.addMVar(self.R, vtype=GRB.BINARY) # numero di bin
-        chi = m.addMVar((self.R, J), vtype=GRB.BINARY)  # job j asseganto a bin r
+        gamma = m.addMVar(self.R, vtype=GRB.BINARY)  # numero di bin
+        # job j asseganto a bin r
+        chi = m.addMVar((self.R, J), vtype=GRB.BINARY)
 
         # Objective
         # uguale a m.setObjective(gamma.sum(), GRB.MINIMIZE)

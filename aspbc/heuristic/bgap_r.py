@@ -3,15 +3,16 @@ from gurobipy import GRB
 import numpy as np
 from .bpp import BinPackingProblem
 from numpy.typing import NDArray
-from aspbc.utility import _array_from_var
+from utility import _array_from_var
+
 
 class BGAPChargeOperations:
-    def __init__(self, 
-                 fleet_size: int, 
-                 job_durations: NDArray[np.int64], 
-                 gamma: NDArray[np.bool_], 
-                 chi: NDArray[np.bool_], 
-                 charge_duration: float, 
+    def __init__(self,
+                 fleet_size: int,
+                 job_durations: NDArray[np.int64],
+                 gamma: NDArray[np.bool_],
+                 chi: NDArray[np.bool_],
+                 charge_duration: float,
                  charging_operations_number=0
                  ) -> None:
         self.M = fleet_size
@@ -19,18 +20,20 @@ class BGAPChargeOperations:
         self.gamma = gamma
         self.chi = chi
         self.t = charge_duration
-        self.R = charging_operations_number if charging_operations_number != 0 else job_durations.shape[0]
+        self.R = charging_operations_number if charging_operations_number != 0 else job_durations.shape[
+            0]
 
     @classmethod
-    def from_bpp(cls, 
-                 bpp: BinPackingProblem, 
-                 fleet_size: int, 
-                 job_durations: np.ndarray, 
+    def from_bpp(cls,
+                 bpp: BinPackingProblem,
+                 fleet_size: int,
+                 job_durations: np.ndarray,
                  charge_duration: float
                  ) -> 'BGAPChargeOperations':
         gamma = bpp.gamma  # (J, )
         chi = bpp.chi      # (R, J)
-        bgap_r = cls(fleet_size, job_durations, gamma, chi, charge_duration, bpp.R)
+        bgap_r = cls(fleet_size, job_durations, gamma,
+                     chi, charge_duration, bpp.R)
         return bgap_r
 
     def solve(self, env=None) -> 'BGAPChargeOperations':

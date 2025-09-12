@@ -14,14 +14,14 @@ from numpy.typing import NDArray
 # y = np.stack([np.outer(chi[r], theta[r]) for r in range(R)], axis = 0) (R, J, M)
 
 class LocalSearch:
-    def __init__(self, 
-                 x: NDArray[np.bool_], 
-                 y: NDArray[np.bool_], 
-                 q: NDArray[np.bool_], 
-                 cmax: float, 
-                 job_durations: NDArray[np.int64], 
-                 energy_job_costs: NDArray[np.float64], 
-                 charge_duration: float, 
+    def __init__(self,
+                 x: NDArray[np.bool_],
+                 y: NDArray[np.bool_],
+                 q: NDArray[np.bool_],
+                 cmax: float,
+                 job_durations: NDArray[np.int64],
+                 energy_job_costs: NDArray[np.float64],
+                 charge_duration: float,
                  battery_capacity: float
                  ) -> None:
         self.x = x  # (J, M)
@@ -34,27 +34,27 @@ class LocalSearch:
         self.b = battery_capacity
 
     @classmethod
-    def from_constrained(cls, 
-                         bgap: BGAPConstrained, 
-                         charge_duration: float, 
+    def from_constrained(cls,
+                         bgap: BGAPConstrained,
+                         charge_duration: float,
                          charging_operations_number=0
                          ) -> 'LocalSearch':
         J = bgap.x.shape[0]
         R = charging_operations_number if charging_operations_number != 0 else J
         x = bgap.x
         y = np.zeros((R, J, bgap.M), dtype=bool)
-        y[0,:,:] = x
+        y[0, :, :] = x
         q = np.zeros((J, bgap.M), dtype=bool)
-        q[0,:] = 1
+        q[0, :] = 1
         cmax = bgap.z
 
         ls = cls(x, y, q, cmax, bgap.d, bgap.e, charge_duration, bgap.b)
         return ls
 
     @classmethod
-    def from_charge(cls, 
-                    bgap: BGAPChargeOperations, 
-                    energy_job_costs: NDArray[np.float64], 
+    def from_charge(cls,
+                    bgap: BGAPChargeOperations,
+                    energy_job_costs: NDArray[np.float64],
                     battery_capacity: float
                     ) -> 'LocalSearch':
         # chi = transfer operation j assigned to charge operation r
@@ -65,11 +65,12 @@ class LocalSearch:
         ls = cls(x, y, bgap.theta, bgap.z, bgap.d,
                  energy_job_costs, bgap.t, battery_capacity)
         return ls
-    
+
     def solve(self):
         t0 = time.time()
         while True:
-            s_star = (0.0, ()) # saving time
+            print(self._compute_cm())
+            s_star = (0.0, ())  # saving time
             s_star = self.saving_add(*s_star)
             s_star = self.save_remove(*s_star)
             s_star = self.save_swap(*s_star)
@@ -115,12 +116,13 @@ class LocalSearch:
                         continue
                     # Consider the cost of doing the job and a new charge
                     m2_with_j = c_m[m2] + self.d[j] + self.t
-                    if fleet_size <= 2:
-                        cm_max = 0 # cm più alto che non è ne m1 ne m2
+                    if fleet_size <= 2 or critical_machines.shape[0] > 1:
+                        cm_max = 0  # cm più alto che non è ne m1 ne m2
                     else:
                         cm_max = c_m[top1] if m2 != top1 else c_m[top2]
                     # Compute saving
-                    s_a = max(0, self.cmax - max(m1_without_j, m2_with_j, cm_max))
+                    s_a = max(0, self.cmax -
+                              max(m1_without_j, m2_with_j, cm_max))
                     # If you save time
                     if s_a > s_star:
                         s_star = s_a
@@ -157,7 +159,7 @@ class LocalSearch:
                                 if charge_left[r1, m1] >= self.e[j2]-self.e[j1] and charge_left[r2, m2] >= self.e[j1]-self.e[j2]:
                                     m1_new = cm[m1] - self.d[j1] + self.d[j2]
                                     m2_new = cm[m2] + self.d[j1] - self.d[j2]
-                                    if M <= 2:
+                                    if M <= 2 or critical_machines.shape[0] > 1:
                                         cm_max = 0
                                     else:
                                         cm_max = cm[top2] if m2 == top1 else cm[top1]
@@ -189,7 +191,7 @@ class LocalSearch:
                     for r2 in np.where(self.q[:, m2] == 1)[0]:
                         # check if you can add this job
                         if charge_left[r2, m2] >= self.e[j]:
-                            if M <= 2:
+                            if M <= 2 or critical_machines.shape[0] > 1:
                                 cm_max = 0
                             else:
                                 cm_max = cm[top2] if m2 == top1 else cm[top1]
