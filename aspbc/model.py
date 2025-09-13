@@ -6,7 +6,6 @@ from .heuristic import BinPackingProblem, BGAPConstrained, BGAPChargeOperations,
 from .parser import parse_file
 from math import ceil
 
-
 class ASPBC:
     def __init__(self,
                  fleet_size: int,
@@ -77,7 +76,6 @@ class ASPBC:
         bpp = BinPackingProblem(self.e, self.b)
         bpp.solve(env)
         self.time = bpp.time
-        self.lb = self.get_bpp_lower_bound(bpp)
 
         local_search = None
         # se numero ricariche necessarie <= numero di AGV

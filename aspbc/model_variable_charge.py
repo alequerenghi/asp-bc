@@ -1,29 +1,34 @@
 from gurobipy import GRB
-import scipy.sparse as sp
 import numpy as np
 import gurobipy as gb
 from numpy.typing import NDArray
-from parser import parse_file
+from aspbc.parser import parse_file
+from math import ceil
 
-class ASPBC:
+class ASPBC_VC:
     def __init__(self, agv_number: int, 
                  job_durations: NDArray[np.int64],
                  battery_capacity: float, 
                  charge_duration: float, 
                  energy_requirements: NDArray[np.float64],
+                 tau = 1.0,
                  charging_operations_number = 0
                  ) -> None:
         self.M = agv_number
         self.d = job_durations
         self.b = battery_capacity
-        self.t = charge_duration
         self.e = energy_requirements
         self.R = energy_requirements.shape[0] if charging_operations_number == 0 else charging_operations_number
+        self.tau = tau
 
-    def solve(self, tau: float, env=None):
+    @classmethod
+    def create_from_file(cls, file_name: str) -> "ASPBC_VC":
+        return cls(*parse_file(file_name))
+
+    def solve(self, env=None):
         J = self.e.shape[0]
 
-        model = gb.Model("ASP-BC-v", env=env)
+        model = gb.Model("ASPBC-VC", env=env)
         x = model.addMVar((J, self.M), vtype=GRB.BINARY)
         q = model.addMVar((self.R, self.M), vtype=GRB.BINARY)
         y = model.addMVar((J, self.R, self.M), vtype=GRB.BINARY)
@@ -35,7 +40,10 @@ class ASPBC:
         model.addConstr(w <= y[:, :-1])
         model.addConstr(w <= q[None, 1:, :])
         model.addConstr(w >= y[:, :-1] + q[None, 1:, :]-1)
-        model.addConstr(cmax >= self.d @ x + tau * (self.e @ w.sum(axis=1)))
+        job_part = self.d @ x
+        wsum = w.sum(axis=1)
+        energy_part = gb.quicksum(self.e[i] * wsum[i] for i in range(J))
+        model.addConstr(cmax >= job_part + energy_part * self.tau)
         model.addConstr(x @ np.ones(self.M) == 1)
         model.addConstr(y.sum(axis=1) == x)
         model.addConstr(2 * y <= x[:, None, :] + q[None, :, :])
@@ -44,16 +52,12 @@ class ASPBC:
         model.addConstr(q[0] == 1)
         model.optimize()
 
-        self.aspbc = model
+        self.ub = model.ObjBound
+        self.time = model.Runtime
+        self.lb = self.get_lower_bound()
+        self.gap = (self.ub - self.lb)/self.lb
+
         return self
-
-    @classmethod
-    def create_from_file(cls, file_name: str) -> "ASPBC":
-        return cls(*parse_file(file_name))
-
-if __name__ == "__main__":
-    with gb.Env() as env:
-        env.setParam("ConcurrentMIP", 3)
-        m = ASPBC.create_from_file(
-            "dataset/ASP-BC Instances/Ins_V2_J50_T10_R60_B10_W1_S90_N0.txt")
-        m.solve(1.0, env)
+    
+    def get_lower_bound(self) -> int:
+        return ceil(np.sum(self.d + self.tau * self.e) / self.M - self.tau * self.b)

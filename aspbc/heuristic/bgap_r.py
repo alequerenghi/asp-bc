@@ -5,7 +5,6 @@ from .bpp import BinPackingProblem
 from numpy.typing import NDArray
 from aspbc.utility import _array_from_var
 
-
 class BGAPChargeOperations:
     def __init__(self,
                  fleet_size: int,
@@ -20,8 +19,7 @@ class BGAPChargeOperations:
         self.gamma = gamma
         self.chi = chi
         self.t = charge_duration
-        self.R = charging_operations_number if charging_operations_number != 0 else job_durations.shape[
-            0]
+        self.R = charging_operations_number if charging_operations_number != 0 else job_durations.shape[0]
 
     @classmethod
     def from_bpp(cls,
