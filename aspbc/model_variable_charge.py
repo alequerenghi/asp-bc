@@ -4,6 +4,7 @@ import gurobipy as gb
 from numpy.typing import NDArray
 from aspbc.parser import parse_file
 from math import ceil
+from .heuristic import BinPackingProblem, BGAPConstrained, BGAPChargeOperations_VC, LocalSearch_VC
 
 class ASPBC_VC:
     def __init__(self, agv_number: int, 
@@ -54,6 +55,33 @@ class ASPBC_VC:
 
         self.ub = model.ObjBound
         self.time = model.Runtime
+        self.lb = self.get_lower_bound()
+        self.gap = model.MIPGap
+
+        return self
+    
+    def solve_matheuristic(self, env=None):
+        bpp = BinPackingProblem(self.e, self.b)
+        bpp.solve(env)
+        self.time = bpp.time
+
+        local_search = None
+        # se numero ricariche necessarie <= numero di AGV
+        if bpp.zeta <= self.M:
+            bgap = BGAPConstrained(self.M, self.e, self.d, self.b)
+            bgap.solve(env)
+            local_search = LocalSearch_VC.from_constrained(bgap, self.tau, self.R)
+        else:
+            bgap = BGAPChargeOperations_VC.from_bpp(bpp, self.M, self.d, self.tau)
+            bgap.solve(env)
+            local_search = LocalSearch_VC.from_charge(bgap, self.e, self.b)
+
+        self.time += bgap.time
+
+        local_search.solve()
+
+        self.ub = local_search.cmax
+        self.time += local_search.time
         self.lb = self.get_lower_bound()
         self.gap = (self.ub - self.lb)/self.lb
 
