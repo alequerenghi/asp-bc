@@ -61,39 +61,52 @@ class LocalSearch_VC:
         # theta = charge operation r assigned to m
         x = bgap.chi.T @ bgap.theta
         q = np.zeros(bgap.theta.shape, dtype=bool)
+        y = np.stack([np.outer(bgap.chi[r], bgap.theta[r])
+                     for r in range(bgap.theta.shape[0])], axis=0)
         for m in range(bgap.M):
-            count = bgap.theta[:,m].sum()
-            for r in range(count):
-                q[r,m] = 1
-        squashed_chi = np.zeros(bgap.chi.shape, dtype=bool)
-        for j in range(bgap.e.shape[0]):
-            count = bgap.chi[:,j].sum()
-            for r in range(count):
-                squashed_chi[r,j] = 1
-        y = np.stack([np.outer(squashed_chi[r], q[r]) for r in range(bgap.theta.shape[0])], axis=0)
-        assert y.sum(axis=0) == x, "OOOOPS"
-        ls = cls(x, y, q, bgap.z, bgap.d, energy_job_costs, bgap.tau, battery_capacity)
+            rs = np.where(bgap.theta[:, m])[0]
+            for i, r in enumerate(rs):
+                q[i, m] = 1
+                if i != r:
+                    y[i] += y[r]
+                    y[r] = 0
+
+        ls = cls(x, y, q, bgap.z, bgap.d, energy_job_costs,
+                 bgap.tau, battery_capacity)
         return ls
 
     def solve(self):
         t0 = time.time()
         while True:
-            s_star = (0.0, ())  # saving time
-            s_star = self.save_swap(*s_star)
-            s_star = self.save_remove(*s_star)
-            s_star = self.saving_add(*s_star)
-            if s_star[0] > 0.0:
-                update = s_star[1]
+            s_star, update = self.iterations()
+            if s_star > 0.0:
                 self.update_best(update)
             else:
                 break
         self.time = time.time() - t0
         return self
 
+    def iterations(self) -> tuple[float, tuple]:
+        s_star = (0.0, ())  # saving time
+        c_m = self._compute_cm()  # duration for all AGVs
+        critical_machines = np.where(c_m == c_m.max())[0]
+
+        for m in critical_machines:
+            for r in np.where(self.q[:, m])[0]:
+                # iterate jobs of most loaded AGV
+                for j in np.where(self.y[r, :, m])[0]:
+                    # Find the respective charge job in m1
+                    idxs = (m, r, j)
+                    s_star = self.save_swap(*idxs, c_m, *s_star)
+                    s_star = self.save_remove(*idxs, c_m, *s_star)
+                    s_star = self.saving_add(*idxs, c_m, *s_star)
+        return s_star
+
     def _compute_cm(self) -> NDArray[np.float64]:
         # quanto tempo impiega ogni AGV a svolgere il suo lavoro
         first = self.d @ self.x
-        second = self.tau * (np.sum((self.e @ self.y)[:-1] * self.q[1:], axis=0))
+        second = self.tau * \
+            (np.sum((self.e @ self.y)[:-1] * self.q[1:], axis=0))
         return first + second
 
     def _get_best_two(self, cm: NDArray[np.float64], m1: np.int64) -> tuple[np.int64, np.int64]:
@@ -108,113 +121,93 @@ class LocalSearch_VC:
         cm[top1] = top1_val
         return (top1, top2)
 
-    def saving_add(self, s_star: float, update: tuple) -> tuple[float, tuple]:
-        fleet_size = self.x.shape[1]
-        c_m = self._compute_cm()  # duration for all AGVs
-        critical_machines = np.where(c_m == c_m.max())[0]
+    def saving_add(self, m1: np.int64, r1: np.int64, j: np.int64, c_m: NDArray[np.float64], s_star: float, update: tuple) -> tuple[float, tuple]:
+        M = self.x.shape[1]
+        critical_machines = np.sum(c_m == c_m.max()) > 1
+        top1, top2 = self._get_best_two(c_m, m1)
+        cond = r1 < self.q[:, m1].sum() - 1
+        m1_without_j = c_m[m1] - self.d[j] - cond * self.tau * self.e[j]
+        # find another AGV
+        for m2 in range(M):
+            if m2 == m1:
+                continue
+            # Find a new charge job in m2
+            r2 = self.q[:, m2].sum(initial=1)
+            # Consider the cost of doing the job and a new charge
+            m2_with_j = c_m[m2] + self.d[j] + \
+                self.tau * (self.e @ self.y[r2-1, :, m2])
+            if M <= 2 or critical_machines:
+                cm_max = 0  # cm più alto che non è ne m1 ne m2
+            else:
+                cm_max = c_m[top1] if m2 != top1 else c_m[top2]
+                # Compute saving
+            s_a = max(0, self.cmax - max(m1_without_j, m2_with_j, cm_max))
+            # If you save time
+            if s_a > s_star:
+                s_star = s_a
+                update = (m1, r1, j, m2, r2, j)
+        return (s_star, update)
 
-        for m1 in critical_machines:
-            top1, top2 = self._get_best_two(c_m, m1)
-            # iterate jobs of most loaded AGV
-            for j in np.where(self.x[:, m1] == 1)[0]:
-                # Find the respective charge job in m1
-                r1 = np.argmax(self.y[:, j, m1] == 1)
-                cond = r1 < np.where(self.q[:,m1])[0].max()
-                m1_without_j = c_m[m1] - self.d[j] - cond * self.tau * self.e[j]
-                # find another AGV
-                for m2 in range(fleet_size):
-                    if m2 == m1:
-                        continue
-                    # Find a new charge job in m2
-                    r2 = (np.where(self.y[:, :, m2] == 1)[0]).max(initial=-1) + 1
-                    # Consider the cost of doing the job and a new charge
-                    m2_with_j = c_m[m2] + self.d[j] + self.tau * (self.e @ self.y[r2,:,m2])
-                    if fleet_size <= 2 or critical_machines.shape[0] > 1:
-                        cm_max = 0  # cm più alto che non è ne m1 ne m2
+    def save_swap(self, m1: np.int64, r1: np.int64, j1: np.int64, c_m: NDArray[np.float64], s_star: float, update: tuple) -> tuple[float, tuple]:
+        M = self.x.shape[1]
+        top1, top2 = self._get_best_two(c_m, m1)
+        critical_machines = np.sum(c_m == c_m.max()) > 1
+        # find another agv
+        for m2 in range(M):
+            if m2 == m1:
+                continue
+            # iterate charge jobs of m2
+            for r2 in np.where(self.q[:, m2] == 1)[0]:
+                # iterate jobs of m2 and r2
+                for j2 in np.where(self.y[r2, :, m2])[0]:
+                    # if both can accept charge
+                    charge_left_r1 = self.b - (self.e @ self.y[r1, :, m1])
+                    charge_left_r2 = self.b - (self.e @ self.y[r2, :, m2])
+                    if charge_left_r1 >= - self.e[j1] + self.e[j2] and charge_left_r2 >= self.e[j1] - self.e[j2]:
+                        cond = r1 < self.q[:, m1].sum() - 1
+                        cond2 = r2 < self.q[:, m2].sum() - 1
+                        m1_new = c_m[m1] - self.d[j1] + self.d[j2] + \
+                            self.tau * (- self.e[j1] + self.e[j2]) * cond
+                        m2_new = c_m[m2] + self.d[j1] - self.d[j2] - \
+                            self.tau * (self.e[j1] - self.e[j2]) * cond2
+                        if M <= 2 or critical_machines:
+                            cm_max = 0
+                        else:
+                            cm_max = c_m[top2] if m2 == top1 else c_m[top1]
+                        s_s = max(0, self.cmax - max(m1_new, m2_new, cm_max))
+                        if s_s > s_star:
+                            s_star = s_s
+                            update = (m1, r1, j1, m2, r2, j2)
+        return (s_star, update)
+
+    def save_remove(self, m1: np.int64, r1: np.int64, j: np.int64, c_m: NDArray[np.float64], s_star: float, update: tuple) -> tuple[float, tuple]:
+        M = self.x.shape[1]
+        top1, top2 = self._get_best_two(c_m, m1)
+        critical_machines = np.sum(c_m == c_m.max()) > 1
+        # iterate jobs of m1
+        cond = r1 < self.q[:, m1].sum() - 1
+        m1_new = c_m[m1] - self.d[j] - cond * self.tau * self.e[j]
+        # find new agv
+        for m2 in range(M):
+            if m2 == m1:
+                continue
+            # iterate charge jobs of m2
+            for r2 in np.where(self.q[:, m2] == 1)[0]:
+                # check if you can add this job
+                charge_left = self.b - (self.e @ self.y[r2, :, m2])
+                if charge_left >= self.e[j]:
+                    cond = r2 < self.q[:, m2].sum() - 1
+                    m2_new = c_m[m2] + self.d[j] + \
+                        cond * self.tau * self.e[j]
+                    if M <= 2 or critical_machines:
+                        cm_max = 0
                     else:
-                        cm_max = c_m[top1] if m2 != top1 else c_m[top2]
-                    # Compute saving
-                    s_a = max(0, self.cmax - max(m1_without_j, m2_with_j, cm_max))
-                    # If you save time
-                    if s_a > s_star:
-                        s_star = s_a
+                        cm_max = c_m[top2] if m2 == top1 else c_m[top1]
+                    s_r = max(0, self.cmax-max(m1_new, m2_new, cm_max))
+                    if s_r > s_star:
+                        s_star = s_r
+                        # find the charge job
                         update = (m1, r1, j, m2, r2, j)
-        return (s_star, update)
-
-    def save_swap(self, s_star: float, update: tuple) -> tuple[float, tuple]:
-        M = self.x.shape[1]
-        cm = self._compute_cm()
-        critical_machines = np.where(cm == cm.max())[0]
-        np.random.shuffle(critical_machines)
-        # Compute the remaining charge (capacity - sum(e[j] * y[r, j, m]))
-        charge_left = self.b - (self.e @ self.y)
-
-        for m1 in critical_machines:
-            top1, top2 = self._get_best_two(cm, m1)
-            # iterate charge jobs of m1
-            for r1 in np.where(self.q[:, m1] == 1)[0]:
-                # iterate jobs on m1 and r1
-                for j1 in np.where(self.y[r1, :, m1] == 1)[0]:
-                    # find another agv
-                    for m2 in range(M):
-                        if m2 == m1:
-                            continue
-                        # iterate charge jobs of m2
-                        for r2 in np.where(self.q[:, m2] == 1)[0]:
-                            # iterate jobs of m2 and r2
-                            for j2 in np.where(self.y[r2, :, m2])[0]:
-                                # if both can accept charge
-                                if charge_left[r1, m1] >= self.e[j2] - self.e[j1] and charge_left[r2, m2] >= self.e[j1]-self.e[j2]:
-                                    cond = r1 < np.where(self.q[:,m1])[0].max() 
-                                    cond2 = r2 < np.where(self.q[:,m2])[0].max() 
-                                    m1_new = cm[m1] - self.d[j1] + self.d[j2] + self.tau * (-cond * self.e[j1] + cond2 * self.e[j2])
-                                    m2_new = cm[m2] + self.d[j1] - self.d[j2] - self.tau * (-cond * self.e[j1] + cond2 * self.e[j2])
-                                    if M <= 2 or critical_machines.shape[0] > 1:
-                                        cm_max = 0
-                                    else:
-                                        cm_max = cm[top2] if m2 == top1 else cm[top1]
-                                    s_s = max(0, self.cmax -
-                                              max(m1_new, m2_new, cm_max))
-                                    if s_s > s_star:
-                                        s_star = s_s
-                                        update = (m1, r1, j1, m2, r2, j2)
-        return (s_star, update)
-
-    def save_remove(self, s_star: float, update: tuple) -> tuple[float, tuple]:
-        M = self.x.shape[1]
-        charge_left = self.b - (self.e @ self.y)
-        cm = self._compute_cm()
-        critical_machines = np.where(cm == cm.max())[0]
-        np.random.shuffle(critical_machines)
-
-        for m1 in critical_machines:
-            top1, top2 = self._get_best_two(cm, m1)
-            # iterate jobs of m1
-            for j in np.where(self.x[:, m1] == 1)[0]:
-                # Find the respective charge job in m1
-                r1 = np.argmax(self.y[:, j, m1] == 1)
-                cond = r1 < np.where(self.q[:,m1])[0].max()
-                m1_new = cm[m1] - self.d[j] - cond * self.tau * self.e[j]
-                # find new agv
-                for m2 in range(M):
-                    if m2 == m1:
-                        continue
-                    # iterate charge jobs of m2
-                    for r2 in np.where(self.q[:, m2] == 1)[0]:
-                        # check if you can add this job
-                        if charge_left[r2, m2] >= self.e[j]:
-                            cond = r2 < np.where(self.q[:,m2])[0].max()
-                            m2_new = cm[m2] + self.d[j] + cond * self.tau * self.e[j]
-                            if M <= 2 or critical_machines.shape[0] > 1:
-                                cm_max = 0
-                            else:
-                                cm_max = cm[top2] if m2 == top1 else cm[top1]
-                            s_r = max(0, self.cmax-max(m1_new, m2_new, cm_max))
-                            if s_r > s_star:
-                                s_star = s_r
-                                # find the charge job
-                                r1 = self.y[:, j, m1].argmax()
-                                update = (m1, r1, j, m2, r2, j)
         return (s_star, update)
 
     def update_best(self, update: tuple) -> 'LocalSearch_VC':
